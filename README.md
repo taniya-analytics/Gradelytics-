@@ -1,99 +1,106 @@
-# Web IDL Type Conversions on JavaScript Values
+﻿# whatwg-url
 
-This package implements, in JavaScript, the algorithms to convert a given JavaScript value according to a given [Web IDL](http://heycam.github.io/webidl/) [type](http://heycam.github.io/webidl/#idl-types).
+whatwg-url is a full implementation of the WHATWG [URL Standard](https://url.spec.whatwg.org/). It can be used standalone, but it also exposes a lot of the internal algorithms that are useful for integrating a URL parser into a project like [jsdom](https://github.com/jsdom/jsdom).
 
-The goal is that you should be able to write code like
+## Specification conformance
 
-```js
-"use strict";
-const conversions = require("webidl-conversions");
+whatwg-url is currently up to date with the URL spec up to commit [43c2713](https://github.com/whatwg/url/commit/43c27137a0bc82c4b800fe74be893255fbeb35f4).
 
-function doStuff(x, y) {
-    x = conversions["boolean"](x);
-    y = conversions["unsigned long"](y);
-    // actual algorithm code here
-}
-```
+For `file:` URLs, whose [origin is left unspecified](https://url.spec.whatwg.org/#concept-url-origin), whatwg-url chooses to use a new opaque origin (which serializes to `"null"`).
 
-and your function `doStuff` will behave the same as a Web IDL operation declared as
-
-```webidl
-undefined doStuff(boolean x, unsigned long y);
-```
+whatwg-url does not yet implement any encoding handling beyond UTF-8. That is, the _encoding override_ parameter does not exist in our API.
 
 ## API
 
-This package's main module's default export is an object with a variety of methods, each corresponding to a different Web IDL type. Each method, when invoked on a JavaScript value, will give back the new JavaScript value that results after passing through the Web IDL conversion rules. (See below for more details on what that means.) Alternately, the method could throw an error, if the Web IDL algorithm is specified to do so: for example `conversions["float"](NaN)` [will throw a `TypeError`](http://heycam.github.io/webidl/#es-float).
+### The `URL` and `URLSearchParams` classes
 
-Each method also accepts a second, optional, parameter for miscellaneous options. For conversion methods that throw errors, a string option `{ context }` may be provided to provide more information in the error message. (For example, `conversions["float"](NaN, { context: "Argument 1 of Interface's operation" })` will throw an error with message `"Argument 1 of Interface's operation is not a finite floating-point value."`)
+The main API is provided by the [`URL`](https://url.spec.whatwg.org/#url-class) and [`URLSearchParams`](https://url.spec.whatwg.org/#interface-urlsearchparams) exports, which follows the spec's behavior in all ways (including e.g. `USVString` conversion). Most consumers of this library will want to use these.
 
-If we are dealing with multiple JavaScript realms (such as those created using Node.js' [vm](https://nodejs.org/api/vm.html) module or the HTML `iframe` element), and exceptions from another realm need to be thrown, one can supply an object option `globals` containing the following properties:
+### Low-level URL Standard API
 
-```js
-{
-  globals: {
-    Number,
-    String,
-    TypeError
-  }
-}
-```
+The following methods are exported for use by places like jsdom that need to implement things like [`HTMLHyperlinkElementUtils`](https://html.spec.whatwg.org/#htmlhyperlinkelementutils). They mostly operate on or return an "internal URL" or ["URL record"](https://url.spec.whatwg.org/#concept-url) type.
 
-Those specific functions will be used when throwing exceptions.
+- [URL parser](https://url.spec.whatwg.org/#concept-url-parser): `parseURL(input, { baseURL })`
+- [Basic URL parser](https://url.spec.whatwg.org/#concept-basic-url-parser): `basicURLParse(input, { baseURL, url, stateOverride })`
+- [URL serializer](https://url.spec.whatwg.org/#concept-url-serializer): `serializeURL(urlRecord, excludeFragment)`
+- [Host serializer](https://url.spec.whatwg.org/#concept-host-serializer): `serializeHost(hostFromURLRecord)`
+- [URL path serializer](https://url.spec.whatwg.org/#url-path-serializer): `serializePath(urlRecord)`
+- [Serialize an integer](https://url.spec.whatwg.org/#serialize-an-integer): `serializeInteger(number)`
+- [Origin](https://url.spec.whatwg.org/#concept-url-origin) [serializer](https://html.spec.whatwg.org/multipage/origin.html#ascii-serialisation-of-an-origin): `serializeURLOrigin(urlRecord)`
+- [Set the username](https://url.spec.whatwg.org/#set-the-username): `setTheUsername(urlRecord, usernameString)`
+- [Set the password](https://url.spec.whatwg.org/#set-the-password): `setThePassword(urlRecord, passwordString)`
+- [Has an opaque path](https://url.spec.whatwg.org/#url-opaque-path): `hasAnOpaquePath(urlRecord)`
+- [Cannot have a username/password/port](https://url.spec.whatwg.org/#cannot-have-a-username-password-port): `cannotHaveAUsernamePasswordPort(urlRecord)`
+- [Percent decode bytes](https://url.spec.whatwg.org/#percent-decode): `percentDecodeBytes(uint8Array)`
+- [Percent decode a string](https://url.spec.whatwg.org/#percent-decode-string): `percentDecodeString(string)`
 
-Specific conversions may also accept other options, the details of which can be found below.
+The `stateOverride` parameter is one of the following strings:
 
-## Conversions implemented
+- [`"scheme start"`](https://url.spec.whatwg.org/#scheme-start-state)
+- [`"scheme"`](https://url.spec.whatwg.org/#scheme-state)
+- [`"no scheme"`](https://url.spec.whatwg.org/#no-scheme-state)
+- [`"special relative or authority"`](https://url.spec.whatwg.org/#special-relative-or-authority-state)
+- [`"path or authority"`](https://url.spec.whatwg.org/#path-or-authority-state)
+- [`"relative"`](https://url.spec.whatwg.org/#relative-state)
+- [`"relative slash"`](https://url.spec.whatwg.org/#relative-slash-state)
+- [`"special authority slashes"`](https://url.spec.whatwg.org/#special-authority-slashes-state)
+- [`"special authority ignore slashes"`](https://url.spec.whatwg.org/#special-authority-ignore-slashes-state)
+- [`"authority"`](https://url.spec.whatwg.org/#authority-state)
+- [`"host"`](https://url.spec.whatwg.org/#host-state)
+- [`"hostname"`](https://url.spec.whatwg.org/#hostname-state)
+- [`"port"`](https://url.spec.whatwg.org/#port-state)
+- [`"file"`](https://url.spec.whatwg.org/#file-state)
+- [`"file slash"`](https://url.spec.whatwg.org/#file-slash-state)
+- [`"file host"`](https://url.spec.whatwg.org/#file-host-state)
+- [`"path start"`](https://url.spec.whatwg.org/#path-start-state)
+- [`"path"`](https://url.spec.whatwg.org/#path-state)
+- [`"opaque path"`](https://url.spec.whatwg.org/#cannot-be-a-base-url-path-state)
+- [`"query"`](https://url.spec.whatwg.org/#query-state)
+- [`"fragment"`](https://url.spec.whatwg.org/#fragment-state)
 
-Conversions for all of the basic types from the Web IDL specification are implemented:
+The URL record type has the following API:
 
-- [`any`](https://heycam.github.io/webidl/#es-any)
-- [`undefined`](https://heycam.github.io/webidl/#es-undefined)
-- [`boolean`](https://heycam.github.io/webidl/#es-boolean)
-- [Integer types](https://heycam.github.io/webidl/#es-integer-types), which can additionally be provided the boolean options `{ clamp, enforceRange }` as a second parameter
-- [`float`](https://heycam.github.io/webidl/#es-float), [`unrestricted float`](https://heycam.github.io/webidl/#es-unrestricted-float)
-- [`double`](https://heycam.github.io/webidl/#es-double), [`unrestricted double`](https://heycam.github.io/webidl/#es-unrestricted-double)
-- [`DOMString`](https://heycam.github.io/webidl/#es-DOMString), which can additionally be provided the boolean option `{ treatNullAsEmptyString }` as a second parameter
-- [`ByteString`](https://heycam.github.io/webidl/#es-ByteString), [`USVString`](https://heycam.github.io/webidl/#es-USVString)
-- [`object`](https://heycam.github.io/webidl/#es-object)
-- [Buffer source types](https://heycam.github.io/webidl/#es-buffer-source-types), which can additionally be provided with the boolean option `{ allowShared }` as a second parameter
+- [`scheme`](https://url.spec.whatwg.org/#concept-url-scheme)
+- [`username`](https://url.spec.whatwg.org/#concept-url-username)
+- [`password`](https://url.spec.whatwg.org/#concept-url-password)
+- [`host`](https://url.spec.whatwg.org/#concept-url-host)
+- [`port`](https://url.spec.whatwg.org/#concept-url-port)
+- [`path`](https://url.spec.whatwg.org/#concept-url-path) (as an array of strings, or a string)
+- [`query`](https://url.spec.whatwg.org/#concept-url-query)
+- [`fragment`](https://url.spec.whatwg.org/#concept-url-fragment)
 
-Additionally, for convenience, the following derived type definitions are implemented:
+These properties should be treated with care, as in general changing them will cause the URL record to be in an inconsistent state until the appropriate invocation of `basicURLParse` is used to fix it up. You can see examples of this in the URL Standard, where there are many step sequences like "4. Set context object’s url’s fragment to the empty string. 5. Basic URL parse _input_ with context object’s url as _url_ and fragment state as _state override_." In between those two steps, a URL record is in an unusable state.
 
-- [`ArrayBufferView`](https://heycam.github.io/webidl/#ArrayBufferView), which can additionally be provided with the boolean option `{ allowShared }` as a second parameter
-- [`BufferSource`](https://heycam.github.io/webidl/#BufferSource)
-- [`DOMTimeStamp`](https://heycam.github.io/webidl/#DOMTimeStamp)
+The return value of "failure" in the spec is represented by `null`. That is, functions like `parseURL` and `basicURLParse` can return _either_ a URL record _or_ `null`.
 
-Derived types, such as nullable types, promise types, sequences, records, etc. are not handled by this library. You may wish to investigate the [webidl2js](https://github.com/jsdom/webidl2js) project.
+### `whatwg-url/webidl2js-wrapper` module
 
-### A note on the `long long` types
+This module exports the `URL` and `URLSearchParams` [interface wrappers API](https://github.com/jsdom/webidl2js#for-interfaces) generated by [webidl2js](https://github.com/jsdom/webidl2js).
 
-The `long long` and `unsigned long long` Web IDL types can hold values that cannot be stored in JavaScript numbers. Conversions are still accurate as we make use of BigInt in the conversion process, but in the case of `unsigned long long` we simply cannot represent some possible output values in JavaScript. For example, converting the JavaScript number `-1` to a Web IDL `unsigned long long` is supposed to produce the Web IDL value `18446744073709551615`. Since we are representing our Web IDL values in JavaScript, we can't represent `18446744073709551615`, so we instead the best we could do is `18446744073709551616` as the output.
+## Development instructions
 
-To mitigate this, we could return the raw BigInt value from the conversion function, but right now it is not implemented. If your use case requires such precision, [file an issue](https://github.com/jsdom/webidl-conversions/issues/new).
+First, install [Node.js](https://nodejs.org/). Then, fetch the dependencies of whatwg-url, by running from this directory:
 
-On the other hand, `long long` conversion is always accurate, since the input value can never be more precise than the output value.
+    npm install
 
-### A note on `BufferSource` types
+To run tests:
 
-All of the `BufferSource` types will throw when the relevant `ArrayBuffer` has been detached. This technically is not part of the [specified conversion algorithm](https://heycam.github.io/webidl/#es-buffer-source-types), but instead part of the [getting a reference/getting a copy](https://heycam.github.io/webidl/#ref-for-dfn-get-buffer-source-reference%E2%91%A0) algorithms. We've consolidated them here for convenience and ease of implementation, but if there is a need to separate them in the future, please open an issue so we can investigate.
+    npm test
 
-## Background
+To generate a coverage report:
 
-What's actually going on here, conceptually, is pretty weird. Let's try to explain.
+    npm run coverage
 
-Web IDL, as part of its madness-inducing design, has its own type system. When people write algorithms in web platform specs, they usually operate on Web IDL values, i.e. instances of Web IDL types. For example, if they were specifying the algorithm for our `doStuff` operation above, they would treat `x` as a Web IDL value of [Web IDL type `boolean`](http://heycam.github.io/webidl/#idl-boolean). Crucially, they would _not_ treat `x` as a JavaScript variable whose value is either the JavaScript `true` or `false`. They're instead working in a different type system altogether, with its own rules.
+To build and run the live viewer:
 
-Separately from its type system, Web IDL defines a ["binding"](http://heycam.github.io/webidl/#ecmascript-binding) of the type system into JavaScript. This contains rules like: when you pass a JavaScript value to the JavaScript method that manifests a given Web IDL operation, how does that get converted into a Web IDL value? For example, a JavaScript `true` passed in the position of a Web IDL `boolean` argument becomes a Web IDL `true`. But, a JavaScript `true` passed in the position of a [Web IDL `unsigned long`](http://heycam.github.io/webidl/#idl-unsigned-long) becomes a Web IDL `1`. And so on.
+    npm run prepare
+    npm run build-live-viewer
 
-Finally, we have the actual implementation code. This is usually C++, although these days [some smart people are using Rust](https://github.com/servo/servo). The implementation, of course, has its own type system. So when they implement the Web IDL algorithms, they don't actually use Web IDL values, since those aren't "real" outside of specs. Instead, implementations apply the Web IDL binding rules in such a way as to convert incoming JavaScript values into C++ values. For example, if code in the browser called `doStuff(true, true)`, then the implementation code would eventually receive a C++ `bool` containing `true` and a C++ `uint32_t` containing `1`.
+Serve the contents of the `live-viewer` directory using any web server.
 
-The upside of all this is that implementations can abstract all the conversion logic away, letting Web IDL handle it, and focus on implementing the relevant methods in C++ with values of the correct type already provided. That is payoff of Web IDL, in a nutshell.
+## Supporting whatwg-url
 
-And getting to that payoff is the goal of _this_ project—but for JavaScript implementations, instead of C++ ones. That is, this library is designed to make it easier for JavaScript developers to write functions that behave like a given Web IDL operation. So conceptually, the conversion pipeline, which in its general form is JavaScript values ↦ Web IDL values ↦ implementation-language values, in this case becomes JavaScript values ↦ Web IDL values ↦ JavaScript values. And that intermediate step is where all the logic is performed: a JavaScript `true` becomes a Web IDL `1` in an unsigned long context, which then becomes a JavaScript `1`.
+The jsdom project (including whatwg-url) is a community-driven project maintained by a team of [volunteers](https://github.com/orgs/jsdom/people). You could support us by:
 
-## Don't use this
-
-Seriously, why would you ever use this? You really shouldn't. Web IDL is … strange, and you shouldn't be emulating its semantics. If you're looking for a generic argument-processing library, you should find one with better rules than those from Web IDL. In general, your JavaScript should not be trying to become more like Web IDL; if anything, we should fix Web IDL to make it more like JavaScript.
-
-The _only_ people who should use this are those trying to create faithful implementations (or polyfills) of web platform interfaces defined in Web IDL. Its main consumer is the [jsdom](https://github.com/jsdom/jsdom) project.
+- [Getting professional support for whatwg-url](https://tidelift.com/subscription/pkg/npm-whatwg-url?utm_source=npm-whatwg-url&utm_medium=referral&utm_campaign=readme) as part of a Tidelift subscription. Tidelift helps making open source sustainable for us while giving teams assurances for maintenance, licensing, and security.
+- Contributing directly to the project.
