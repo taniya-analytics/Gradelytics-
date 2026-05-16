@@ -1,51 +1,149 @@
-// ─────────────────────────────────────────
-//  Gradelytics — Express Server Entry Point
-// ─────────────────────────────────────────
-const express = require('express');
-const cors = require('cors');
-const morgan = require('morgan');
-const dotenv = require('dotenv');
-const connectDB = require('./config/db');
+/*!
+ * vary
+ * Copyright(c) 2014-2017 Douglas Christopher Wilson
+ * MIT Licensed
+ */
 
-dotenv.config();
+'use strict'
 
-// Connect to MongoDB
-connectDB();
+/**
+ * Module exports.
+ */
 
-const app = express();
+module.exports = vary
+module.exports.append = append
 
-// ── Middleware ────────────────────────────
-app.use(cors({ origin: 'http://localhost:3000', credentials: true }));
-app.use(express.json());
-app.use(morgan('dev'));
+/**
+ * RegExp to match field-name in RFC 7230 sec 3.2
+ *
+ * field-name    = token
+ * token         = 1*tchar
+ * tchar         = "!" / "#" / "$" / "%" / "&" / "'" / "*"
+ *               / "+" / "-" / "." / "^" / "_" / "`" / "|" / "~"
+ *               / DIGIT / ALPHA
+ *               ; any VCHAR, except delimiters
+ */
 
-// ── Routes ────────────────────────────────
-app.use('/api/auth', require('./routes/auth'));
-app.use('/api/students', require('./routes/students'));
-app.use('/api/predict', require('./routes/predict'));
-app.use('/api/analytics', require('./routes/analytics'));
-app.use('/api/admin', require('./routes/admin'));
-app.use('/api/feedback', require('./routes/feedback'));
-app.use('/api/connect', require('./routes/connect')); // NEW: Connection system
+var FIELD_NAME_REGEXP = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/
 
-// ── Health Check ──────────────────────────
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', service: 'Gradelytics API', timestamp: new Date() });
-});
+/**
+ * Append a field to a vary header.
+ *
+ * @param {String} header
+ * @param {String|Array} field
+ * @return {String}
+ * @public
+ */
 
-// ── Global Error Handler ──────────────────
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(err.statusCode || 500).json({
-    success: false,
-    message: err.message || 'Internal Server Error',
-  });
-});
+function append (header, field) {
+  if (typeof header !== 'string') {
+    throw new TypeError('header argument is required')
+  }
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () =>
-  console.log(`\n🚀 Gradelytics API running on port ${PORT} [${process.env.NODE_ENV}]\n`)
-);
+  if (!field) {
+    throw new TypeError('field argument is required')
+  }
 
-// ── Admin Routes ──────────────────────────
-// (append this to existing route registrations)
+  // get fields array
+  var fields = !Array.isArray(field)
+    ? parse(String(field))
+    : field
+
+  // assert on invalid field names
+  for (var j = 0; j < fields.length; j++) {
+    if (!FIELD_NAME_REGEXP.test(fields[j])) {
+      throw new TypeError('field argument contains an invalid header name')
+    }
+  }
+
+  // existing, unspecified vary
+  if (header === '*') {
+    return header
+  }
+
+  // enumerate current values
+  var val = header
+  var vals = parse(header.toLowerCase())
+
+  // unspecified vary
+  if (fields.indexOf('*') !== -1 || vals.indexOf('*') !== -1) {
+    return '*'
+  }
+
+  for (var i = 0; i < fields.length; i++) {
+    var fld = fields[i].toLowerCase()
+
+    // append value (case-preserving)
+    if (vals.indexOf(fld) === -1) {
+      vals.push(fld)
+      val = val
+        ? val + ', ' + fields[i]
+        : fields[i]
+    }
+  }
+
+  return val
+}
+
+/**
+ * Parse a vary header into an array.
+ *
+ * @param {String} header
+ * @return {Array}
+ * @private
+ */
+
+function parse (header) {
+  var end = 0
+  var list = []
+  var start = 0
+
+  // gather tokens
+  for (var i = 0, len = header.length; i < len; i++) {
+    switch (header.charCodeAt(i)) {
+      case 0x20: /*   */
+        if (start === end) {
+          start = end = i + 1
+        }
+        break
+      case 0x2c: /* , */
+        list.push(header.substring(start, end))
+        start = end = i + 1
+        break
+      default:
+        end = i + 1
+        break
+    }
+  }
+
+  // final token
+  list.push(header.substring(start, end))
+
+  return list
+}
+
+/**
+ * Mark that a request is varied on a header field.
+ *
+ * @param {Object} res
+ * @param {String|Array} field
+ * @public
+ */
+
+function vary (res, field) {
+  if (!res || !res.getHeader || !res.setHeader) {
+    // quack quack
+    throw new TypeError('res argument is required')
+  }
+
+  // get existing header
+  var val = res.getHeader('Vary') || ''
+  var header = Array.isArray(val)
+    ? val.join(', ')
+    : String(val)
+
+  // set new header
+  if ((val = append(header, field))) {
+    res.setHeader('Vary', val)
+  }
+}

@@ -1,197 +1,101 @@
-# Gradelytics — AI Student Performance Analytics
-### MERN Stack + Python ML Final Year Project
+# vary
 
----
+[![NPM Version][npm-image]][npm-url]
+[![NPM Downloads][downloads-image]][downloads-url]
+[![Node.js Version][node-version-image]][node-version-url]
+[![Build Status][travis-image]][travis-url]
+[![Test Coverage][coveralls-image]][coveralls-url]
 
-## 🗂 Project Structure
+Manipulate the HTTP Vary header
 
-```
-gradelytics/
-├── client/          → React.js Frontend
-├── server/          → Node.js + Express Backend
-├── ml-service/      → Python Flask ML Microservice
-└── docker-compose.yml
-```
+## Installation
 
----
+This is a [Node.js](https://nodejs.org/en/) module available through the
+[npm registry](https://www.npmjs.com/). Installation is done using the
+[`npm install` command](https://docs.npmjs.com/getting-started/installing-npm-packages-locally): 
 
-## ⚡ Quick Start (Manual)
-
-### 1. Prerequisites
-- Node.js 18+
-- Python 3.10+
-- MongoDB Atlas account (free tier) OR local MongoDB
-
----
-
-### 2. Backend (Express API)
-
-```bash
-cd server
-cp .env.example .env
-# Edit .env — add your MONGO_URI from MongoDB Atlas
-
-npm install
-node seed.js        # Populate with sample data
-npm run dev         # Starts on http://localhost:5000
+```sh
+$ npm install vary
 ```
 
----
+## API
 
-### 3. ML Microservice (Flask)
+<!-- eslint-disable no-unused-vars -->
 
-```bash
-cd ml-service
-pip install -r requirements.txt
-
-# Optional: download UCI dataset (student-mat.csv) to this folder
-# https://archive.ics.uci.edu/ml/datasets/Student+Performance
-
-python train_model.py   # Trains & saves models (takes ~10s)
-python app.py           # Starts on http://localhost:8000
+```js
+var vary = require('vary')
 ```
 
----
+### vary(res, field)
 
-### 4. Frontend (React)
+Adds the given header `field` to the `Vary` response header of `res`.
+This can be a string of a single field, a string of a valid `Vary`
+header, or an array of multiple fields.
 
-```bash
-cd client
-npm install
-npm start           # Starts on http://localhost:3000
+This will append the header if not already listed, otherwise leaves
+it listed in the current location.
+
+<!-- eslint-disable no-undef -->
+
+```js
+// Append "Origin" to the Vary header of the response
+vary(res, 'Origin')
 ```
 
----
+### vary.append(header, field)
 
-### 5. Login Credentials (after seed.js)
+Adds the given header `field` to the `Vary` response header string `header`.
+This can be a string of a single field, a string of a valid `Vary` header,
+or an array of multiple fields.
 
-| Role    | Email                       | Password    |
-|---------|-----------------------------|-------------|
-| Admin   | admin@gradelytics.com        | admin123    |
-| Teacher | teacher@gradelytics.com      | teacher123  |
-| Student | amara@student.com           | student123  |
+This will append the header if not already listed, otherwise leaves
+it listed in the current location. The new header string is returned.
 
----
+<!-- eslint-disable no-undef -->
 
-## 🐳 Docker (Run Everything at Once)
-
-```bash
-# From the root gradelytics/ folder:
-docker-compose up --build
-
-# Services:
-# React Frontend  →  http://localhost:3000
-# Express API     →  http://localhost:5000
-# Flask ML        →  http://localhost:8000
-# MongoDB         →  localhost:27017
+```js
+// Get header string appending "Origin" to "Accept, User-Agent"
+vary.append('Accept, User-Agent', 'Origin')
 ```
 
----
+## Examples
 
-## 🔌 API Reference
+### Updating the Vary header when content is based on it
 
-### Auth
-| Method | Endpoint             | Description        |
-|--------|----------------------|--------------------|
-| POST   | /api/auth/register   | Register new user  |
-| POST   | /api/auth/login      | Login & get token  |
-| GET    | /api/auth/me         | Get current user   |
+```js
+var http = require('http')
+var vary = require('vary')
 
-### Students
-| Method | Endpoint                       | Description            |
-|--------|--------------------------------|------------------------|
-| GET    | /api/students                  | List all students      |
-| POST   | /api/students                  | Add new student        |
-| GET    | /api/students/:id              | Get student profile    |
-| PUT    | /api/students/:id              | Update student         |
-| PUT    | /api/students/:id/grades       | Add grade record       |
-| PUT    | /api/students/:id/assignments  | Add assignment         |
-| DELETE | /api/students/:id              | Remove student         |
+http.createServer(function onRequest (req, res) {
+  // about to user-agent sniff
+  vary(res, 'User-Agent')
 
-### AI Predictions
-| Method | Endpoint                         | Description              |
-|--------|----------------------------------|--------------------------|
-| POST   | /api/predict/:studentId          | Run new AI prediction    |
-| GET    | /api/predict/:studentId/history  | Get prediction history   |
+  var ua = req.headers['user-agent'] || ''
+  var isMobile = /mobi|android|touch|mini/i.test(ua)
 
-### Analytics
-| Method | Endpoint                        | Description               |
-|--------|---------------------------------|---------------------------|
-| GET    | /api/analytics/overview         | Cohort KPIs               |
-| GET    | /api/analytics/at-risk          | At-risk student list      |
-| GET    | /api/analytics/attendance       | Attendance distribution   |
-| GET    | /api/analytics/predictions/summary | Score summary          |
+  // serve site, depending on isMobile
+  res.setHeader('Content-Type', 'text/html')
+  res.end('You are (probably) ' + (isMobile ? '' : 'not ') + 'a mobile user')
+})
+```
 
-### ML Service
-| Method | Endpoint      | Description                   |
-|--------|---------------|-------------------------------|
-| POST   | /predict      | Single student prediction     |
-| POST   | /predict/batch| Batch predictions             |
-| GET    | /health       | Service health check          |
+## Testing
 
----
+```sh
+$ npm test
+```
 
-## 🤖 ML Model
+## License
 
-**Algorithm:** Gradient Boosting (GradientBoostingRegressor + GradientBoostingClassifier)
+[MIT](LICENSE)
 
-**Input Features:**
-- Attendance rate (%)
-- Assignment average score
-- Midterm exam score
-- Daily study hours
-- Previous GPA (0–4.0)
-
-**Outputs:**
-- Predicted final exam score (0–100)
-- Pass probability (%)
-- Dropout risk (%)
-- Model confidence (%)
-- Personalised study recommendations
-
-**Training data:** UCI Student Performance Dataset or auto-generated synthetic data
-
----
-
-## 📱 Frontend Pages
-
-| Route              | Page               | Access         |
-|--------------------|--------------------|----------------|
-| /login             | Login              | Public         |
-| /register          | Register           | Public         |
-| /dashboard         | KPI Dashboard      | All roles      |
-| /students          | Student List       | All roles      |
-| /students/add      | Add Student Form   | Teacher, Admin |
-| /students/:id      | Student Profile    | All roles      |
-| /predict/:id       | AI Prediction Run  | All roles      |
-| /analytics         | Cohort Analytics   | Teacher, Admin |
-
----
-
-## 🏗 Tech Stack
-
-| Layer        | Technology                              |
-|--------------|-----------------------------------------|
-| Frontend     | React 18, React Router 6, Recharts      |
-| Styling      | CSS Variables, DM Mono + Syne fonts     |
-| Backend      | Node.js, Express 4, JWT, bcrypt         |
-| Database     | MongoDB, Mongoose ODM                   |
-| ML Service   | Python 3, Flask, Scikit-learn           |
-| Auth         | JWT Bearer tokens, role-based guards    |
-| Deployment   | Docker, Docker Compose, Nginx           |
-
----
-
-## 🎓 Final Year Project Notes
-
-This project demonstrates:
-1. **Multi-service architecture** — React ↔ Express ↔ Flask ↔ MongoDB
-2. **Machine learning integration** — trained Gradient Boosting model with real features
-3. **Role-based access control** — student/teacher/admin permissions
-4. **Data visualisation** — radar, line, bar, pie, scatter charts
-5. **RESTful API design** — proper HTTP methods, status codes, validation
-6. **Production-ready patterns** — JWT auth, error handling, environment config, Docker
-
----
-
-*Built with Gradelytics — MERN + AI Student Performance Analytics System*
+[npm-image]: https://img.shields.io/npm/v/vary.svg
+[npm-url]: https://npmjs.org/package/vary
+[node-version-image]: https://img.shields.io/node/v/vary.svg
+[node-version-url]: https://nodejs.org/en/download
+[travis-image]: https://img.shields.io/travis/jshttp/vary/master.svg
+[travis-url]: https://travis-ci.org/jshttp/vary
+[coveralls-image]: https://img.shields.io/coveralls/jshttp/vary/master.svg
+[coveralls-url]: https://coveralls.io/r/jshttp/vary
+[downloads-image]: https://img.shields.io/npm/dm/vary.svg
+[downloads-url]: https://npmjs.org/package/vary
