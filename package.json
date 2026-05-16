@@ -1,55 +1,27 @@
 {
-  "name": "undici-types",
-  "version": "7.18.2",
-  "description": "A stand-alone types package for Undici",
-  "homepage": "https://undici.nodejs.org",
-  "bugs": {
-    "url": "https://github.com/nodejs/undici/issues"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/nodejs/undici.git"
-  },
+  "name": "unpipe",
+  "description": "Unpipe a stream from all destinations",
+  "version": "1.0.0",
+  "author": "Douglas Christopher Wilson <doug@somethingdoug.com>",
   "license": "MIT",
-  "types": "index.d.ts",
+  "repository": "stream-utils/unpipe",
+  "devDependencies": {
+    "istanbul": "0.3.15",
+    "mocha": "2.2.5",
+    "readable-stream": "1.1.13"
+  },
   "files": [
-    "*.d.ts"
+    "HISTORY.md",
+    "LICENSE",
+    "README.md",
+    "index.js"
   ],
-  "contributors": [
-    {
-      "name": "Daniele Belardi",
-      "url": "https://github.com/dnlup",
-      "author": true
-    },
-    {
-      "name": "Ethan Arrowood",
-      "url": "https://github.com/ethan-arrowood",
-      "author": true
-    },
-    {
-      "name": "Matteo Collina",
-      "url": "https://github.com/mcollina",
-      "author": true
-    },
-    {
-      "name": "Matthew Aitken",
-      "url": "https://github.com/KhafraDev",
-      "author": true
-    },
-    {
-      "name": "Robert Nagy",
-      "url": "https://github.com/ronag",
-      "author": true
-    },
-    {
-      "name": "Szymon Marczak",
-      "url": "https://github.com/szmarczak",
-      "author": true
-    },
-    {
-      "name": "Tomas Della Vedova",
-      "url": "https://github.com/delvedor",
-      "author": true
-    }
-  ]
+  "engines": {
+    "node": ">= 0.8"
+  },
+  "scripts": {
+    "test": "mocha --reporter spec --bail --check-leaks test/",
+    "test-cov": "istanbul cover node_modules/mocha/bin/_mocha -- --reporter dot --check-leaks test/",
+    "test-travis": "istanbul cover node_modules/mocha/bin/_mocha --report lcovonly -- --reporter spec --check-leaks test/"
+  }
 }
